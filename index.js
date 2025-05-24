@@ -91,23 +91,37 @@ async function run() {
         app.put('/recipes/:id', async (req, res) => {
             const id = req.params.id;
             const updatedRecipe = req.body;
-
-            const filter = { _id: new ObjectId(id) };
-            const updateDoc = {
-                $set: {
-                    image: updatedRecipe.image,
-                    title: updatedRecipe.title,
-                    ingredients: updatedRecipe.ingredients,
-                    instructions: updatedRecipe.instructions,
-                    cuisine: updatedRecipe.cuisine,
-                    prepTime: updatedRecipe.prepTime,
-                    categories: updatedRecipe.categories,
-                },
-            };
+            const userEmail = updatedRecipe.userEmail;
 
             try {
-                const result = await recipesCollection.updateOne(filter, updateDoc);
+                // Get the existing recipe
+                const existingRecipe = await recipesCollection.findOne({ _id: new ObjectId(id) });
+
+                if (!existingRecipe) {
+                    return res.status(404).send({ message: 'Recipe not found' });
+                }
+
+                // Check ownership
+                if (existingRecipe.ownerEmail !== userEmail) {
+                    return res.status(403).send({ message: 'You are not allowed to update this recipe' });
+                }
+
+                // Update the recipe
+                const updateDoc = {
+                    $set: {
+                        image: updatedRecipe.image,
+                        title: updatedRecipe.title,
+                        ingredients: updatedRecipe.ingredients,
+                        instructions: updatedRecipe.instructions,
+                        cuisine: updatedRecipe.cuisine,
+                        prepTime: updatedRecipe.prepTime,
+                        categories: updatedRecipe.categories,
+                    },
+                };
+
+                const result = await recipesCollection.updateOne({ _id: new ObjectId(id) }, updateDoc);
                 res.send(result);
+
             } catch (err) {
                 console.error(err);
                 res.status(500).send({ message: 'Failed to update recipe' });
