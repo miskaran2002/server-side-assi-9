@@ -129,16 +129,39 @@ async function run() {
         });
 
         // Delete a recipe
+        // DELETE a recipe by ID with email-based ownership check
         app.delete('/recipes/:id', async (req, res) => {
+            const recipeId = req.params.id;
+            const { userEmail } = req.body; // Send this from frontend
+
+            if (!userEmail) {
+                return res.status(400).json({ message: 'User email is required.' });
+            }
+
             try {
-                const id = req.params.id;
-                const result = await recipesCollection.deleteOne({ _id: new ObjectId(id) });
-                res.send(result);
-            } catch (err) {
-                console.error(err);
-                res.status(400).send({ message: 'Invalid recipe ID' });
+                const recipe = await recipesCollection.findOne({ _id: new ObjectId(recipeId) });
+
+                if (!recipe) {
+                    return res.status(404).json({ message: 'Recipe not found.' });
+                }
+
+                if (recipe.ownerEmail !== userEmail) {
+                    return res.status(403).json({ message: 'Forbidden: You can only delete your own recipe.' });
+                }
+
+                const result = await recipesCollection.deleteOne({ _id: new ObjectId(recipeId) });
+
+                if (result.deletedCount === 1) {
+                    res.status(200).json({ message: 'Recipe deleted successfully.', deletedCount: 1 });
+                } else {
+                    res.status(500).json({ message: 'Failed to delete the recipe.' });
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                res.status(500).json({ message: 'Internal server error.' });
             }
         });
+
 
         // Like a recipe (increment likes)
         app.patch('/recipes/:id/like', async (req, res) => {
